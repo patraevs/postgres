@@ -73,16 +73,6 @@ def _count_warehouses() -> int:
         return cur.fetchone()[0]
 
 
-def _get_central_id() -> int:
-    conn = get_conn()
-    with conn.cursor() as cur:
-        cur.execute("SELECT id FROM catalog.warehouses WHERE is_central = TRUE")
-        row = cur.fetchone()
-        if row:
-            return row[0]
-        raise ValueError("Не удалось получить ID центрального склада")
-
-
 @command("list warehouses", "список всех складов", CATEGORY_WAREHOUSES)
 def list_warehouses() -> None:
     conn = get_conn()
@@ -137,15 +127,7 @@ def add_warehouse() -> None:
         answer = prompt("Сделать центральным? (y/n): ", validator=YesNoValidator())
         is_central = YesNoValidator.is_yes(answer)
         if is_central:
-            try:
-                old_id = _get_central_id()
-            except ValueError as e:
-                render_error(str(e))
-                return
-            conn.execute(
-                "UPDATE catalog.warehouses SET is_central = FALSE WHERE id = %s",
-                (old_id,),
-            )
+            conn.execute("UPDATE catalog.warehouses SET is_central = FALSE")
 
     conn.execute(
         "INSERT INTO catalog.warehouses (city, address, label, is_central) VALUES (%s, %s, %s, %s)",
@@ -189,15 +171,8 @@ def edit_warehouse(_id: str) -> None:
         )
         is_central = YesNoValidator.is_yes(answer)
 
-    if is_central and not warehouse.is_central:
-        try:
-            old_id = _get_central_id()
-        except ValueError as e:
-            render_error(str(e))
-            return
-        conn.execute(
-            "UPDATE catalog.warehouses SET is_central = FALSE WHERE id = %s", (old_id,)
-        )
+    if is_central:
+        conn.execute("UPDATE catalog.warehouses SET is_central = FALSE")
 
     conn.execute(
         """UPDATE catalog.warehouses SET city = %s, address = %s, label = %s, is_central = %s
@@ -223,7 +198,7 @@ def delete_warehouse(_id: str) -> None:
 
     _render_warehouse(warehouse)
 
-    if warehouse.is_central and _count_warehouses() > 1:
+    if warehouse.is_central:
         render_error(
             "Нельзя удалить центральный склад. Сначала назначьте другой склад центральным."
         )

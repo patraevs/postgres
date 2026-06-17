@@ -4,6 +4,7 @@ from rich.panel import Panel
 from rich.table import Table
 from psycopg.rows import class_row
 from prompt_toolkit import prompt
+from prompt_toolkit.shortcuts import choice
 
 from db import get_conn
 from console import console, render_error
@@ -42,6 +43,13 @@ def _get_category_name(category_id: int) -> str:
         )
         row = cur.fetchone()
         return row[0] if row else "—"
+
+
+def _get_categories() -> list[tuple[int, str]]:
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("SELECT id, name FROM catalog.product_categories ORDER BY name")
+        return cur.fetchall()
 
 
 def _render_product(product: Product):
@@ -126,11 +134,12 @@ def add_product() -> None:
     sku = prompt("SKU: ", validator=NonEmptyValidator()).strip()
     name = prompt("Имя: ", validator=NonEmptyValidator()).strip()
     price = prompt("Цена: ", validator=PriceValidator()).strip()
-    category_id = prompt("ID категории: ", validator=NonEmptyValidator()).strip()
 
-    if not _category_exists(int(category_id)):
-        render_error(f"Категория с ID {category_id} не найдена")
-        return
+    categories = _get_categories()
+    category_id = choice(
+        message="Выберите категорию:",
+        options=categories,
+    )
 
     conn.execute(
         "INSERT INTO catalog.products (sku, name, price, category_id) VALUES (%s, %s, %s, %s)",
@@ -168,15 +177,18 @@ def edit_product(_id: str) -> None:
     price = prompt(
         "Цена: ", default=str(product.price), validator=PriceValidator()
     ).strip()
-    category_id = prompt(
-        "ID категории: ",
-        default=str(product.category_id),
-        validator=NonEmptyValidator(),
-    ).strip()
 
-    if not _category_exists(int(category_id)):
-        render_error(f"Категория с ID {category_id} не найдена")
-        return
+    categories = _get_categories()
+    default_category = next(
+        (cat_id for cat_id, _ in categories if cat_id == product.category_id),
+        categories[0][0] if categories else None
+    )
+
+    category_id = choice(
+        message="Выберите категорию:",
+        options=categories,
+        default=default_category,
+    )
 
     conn.execute(
         """UPDATE catalog.products SET sku = %s, name = %s, price = %s, category_id = %s
