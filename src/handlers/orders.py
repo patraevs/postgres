@@ -288,18 +288,14 @@ def edit_order(_id: str) -> None:
 
     warehouse_options = [(str(w[0]), f"{w[0]} - {w[1]}") for w in warehouses]
 
-    default_index = None
-    for i, (key, _) in enumerate(warehouse_options):
-        if int(key) == order.warehouse_id:
-            default_index = i
-            break
+    current_warehouse_id = next(
+        wh_opt[0] for wh_opt in warehouse_options if int(wh_opt[0]) == order.warehouse_id
+    )
 
     warehouse_id_str = choice(
         message="Выберите склад:",
         options=warehouse_options,
-        default=(
-            warehouse_options[default_index][0] if default_index is not None else None
-        ),
+        default=current_warehouse_id,
     )
     warehouse_id = int(warehouse_id_str)
 

@@ -116,11 +116,15 @@ def add_product() -> None:
     sku = prompt("SKU: ", validator=NonEmptyValidator()).strip()
     name = prompt("Имя: ", validator=NonEmptyValidator()).strip()
     price = prompt("Цена: ", validator=PriceValidator()).strip()
-    category_name = prompt("Категория: ", validator=NonEmptyValidator()).strip()
 
-    if not _category_exists(category_name):
-        render_error(f"Категория '{category_name}' не найдена")
-        return
+    with conn.cursor() as cur:
+        cur.execute("SELECT name FROM catalog.product_categories ORDER BY name")
+        categories = [row[0] for row in cur.fetchall()]
+
+    category_name = prompt(
+        "Категория: ",
+        validator=ChoiceValidator(categories, case_sensitive=False),
+    ).strip()
 
     conn.execute(
         "INSERT INTO catalog.products (sku, name, price, category) VALUES (%s, %s, %s, %s)",
@@ -157,15 +161,16 @@ def edit_product(_id: str) -> None:
     price = prompt(
         "Цена: ", default=str(product.price), validator=PriceValidator()
     ).strip()
-    category_name = prompt(
-        "Категория (имя): ",
-        default=product.category,
-        validator=NonEmptyValidator(),
-    ).strip()
 
-    if not _category_exists(category_name):
-        render_error(f"Категория '{category_name}' не найдена")
-        return
+    with conn.cursor() as cur:
+        cur.execute("SELECT name FROM catalog.product_categories ORDER BY name")
+        categories = [row[0] for row in cur.fetchall()]
+
+    category_name = prompt(
+        "Категория: ",
+        default=product.category,
+        validator=ChoiceValidator(categories, case_sensitive=False),
+    ).strip()
 
     conn.execute(
         """UPDATE catalog.products SET sku = %s, name = %s, price = %s, category = %s
