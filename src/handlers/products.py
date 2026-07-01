@@ -3,7 +3,7 @@ from decimal import Decimal
 from rich.panel import Panel
 from rich.table import Table
 from psycopg.rows import class_row
-from prompt_toolkit import prompt
+from prompt_toolkit.shortcuts import prompt, choice
 
 from db import get_conn
 from console import console, render_error
@@ -121,10 +121,11 @@ def add_product() -> None:
         cur.execute("SELECT name FROM catalog.product_categories ORDER BY name")
         categories = [row[0] for row in cur.fetchall()]
 
-    category_name = prompt(
-        "Категория: ",
-        validator=ChoiceValidator(categories, case_sensitive=False),
-    ).strip()
+    category_name = choice(
+        message="Выберите категорию:",
+        options=[(cat, cat) for cat in categories],
+        default=categories[0] if categories else None,
+    )
 
     conn.execute(
         "INSERT INTO catalog.products (sku, name, price, category) VALUES (%s, %s, %s, %s)",
@@ -166,11 +167,11 @@ def edit_product(_id: str) -> None:
         cur.execute("SELECT name FROM catalog.product_categories ORDER BY name")
         categories = [row[0] for row in cur.fetchall()]
 
-    category_name = prompt(
-        "Категория: ",
+    category_name = choice(
+        message="Выберите категорию:",
+        options=[(cat, cat) for cat in categories],
         default=product.category,
-        validator=ChoiceValidator(categories, case_sensitive=False),
-    ).strip()
+    )
 
     conn.execute(
         """UPDATE catalog.products SET sku = %s, name = %s, price = %s, category = %s
