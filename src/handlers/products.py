@@ -15,6 +15,8 @@ from validators import (
     PriceValidator,
 )
 
+from auth import ROLE_CATALOG_MANAGER, ROLE_SALES_MANAGER
+
 
 @dataclass
 class Product:
@@ -59,7 +61,12 @@ def _render_product(product: Product):
     console.print(panel)
 
 
-@command("list products", "список всех товаров", CATEGORY_PRODUCTS)
+@command(
+    "list products",
+    "список всех товаров",
+    CATEGORY_PRODUCTS,
+    [ROLE_CATALOG_MANAGER, ROLE_SALES_MANAGER],
+)
 def list_products() -> None:
     """
     Выводит список всех продуктов из таблицы catalog.products.
@@ -88,7 +95,12 @@ def list_products() -> None:
     console.print(table)
 
 
-@command("show product", "информация о товаре", CATEGORY_PRODUCTS)
+@command(
+    "show product",
+    "информация о товаре",
+    CATEGORY_PRODUCTS,
+    [ROLE_CATALOG_MANAGER, ROLE_SALES_MANAGER],
+)
 def show_product(_id: str) -> None:
     """
     Показывает детальную информацию о продукте по его ID.
@@ -106,7 +118,12 @@ def show_product(_id: str) -> None:
     _render_product(product)
 
 
-@command("add product", "добавить товар (интерактивно)", CATEGORY_PRODUCTS)
+@command(
+    "add product",
+    "добавить товар (интерактивно)",
+    CATEGORY_PRODUCTS,
+    [ROLE_CATALOG_MANAGER],
+)
 def add_product() -> None:
     """
     Добавляет новый продукт в базу данных.
@@ -116,15 +133,11 @@ def add_product() -> None:
     sku = prompt("SKU: ", validator=NonEmptyValidator()).strip()
     name = prompt("Имя: ", validator=NonEmptyValidator()).strip()
     price = prompt("Цена: ", validator=PriceValidator()).strip()
+    category_name = prompt("Категория: ", validator=NonEmptyValidator()).strip()
 
-    with conn.cursor() as cur:
-        cur.execute("SELECT name FROM catalog.product_categories ORDER BY name")
-        categories = [row[0] for row in cur.fetchall()]
-
-    category_name = prompt(
-        "Категория: ",
-        validator=ChoiceValidator(categories, case_sensitive=False),
-    ).strip()
+    if not _category_exists(category_name):
+        render_error(f"Категория '{category_name}' не найдена")
+        return
 
     conn.execute(
         "INSERT INTO catalog.products (sku, name, price, category) VALUES (%s, %s, %s, %s)",
@@ -136,7 +149,9 @@ def add_product() -> None:
     )
 
 
-@command("edit product", "редактировать товар", CATEGORY_PRODUCTS)
+@command(
+    "edit product", "редактировать товар", CATEGORY_PRODUCTS, [ROLE_CATALOG_MANAGER]
+)
 def edit_product(_id: str) -> None:
     """
     Редактирует существующий продукт.
@@ -161,16 +176,15 @@ def edit_product(_id: str) -> None:
     price = prompt(
         "Цена: ", default=str(product.price), validator=PriceValidator()
     ).strip()
-
-    with conn.cursor() as cur:
-        cur.execute("SELECT name FROM catalog.product_categories ORDER BY name")
-        categories = [row[0] for row in cur.fetchall()]
-
     category_name = prompt(
-        "Категория: ",
+        "Категория (имя): ",
         default=product.category,
-        validator=ChoiceValidator(categories, case_sensitive=False),
+        validator=NonEmptyValidator(),
     ).strip()
+
+    if not _category_exists(category_name):
+        render_error(f"Категория '{category_name}' не найдена")
+        return
 
     conn.execute(
         """UPDATE catalog.products SET sku = %s, name = %s, price = %s, category = %s
@@ -182,7 +196,7 @@ def edit_product(_id: str) -> None:
     )
 
 
-@command("delete product", "удалить товар", CATEGORY_PRODUCTS)
+@command("delete product", "удалить товар", CATEGORY_PRODUCTS, [ROLE_CATALOG_MANAGER])
 def delete_product(_id: str) -> None:
     """
     Удаляет продукт из базы данных.
